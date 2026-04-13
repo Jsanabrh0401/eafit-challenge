@@ -245,9 +245,9 @@ jobs:
                 | jq -r '.[0].id // empty' 2>/dev/null || echo "")
               ok "AnonCreds credential definition already exists: ${ANONCREDS_CRED_DEF_ID} — skipping"
             else
-              # Find the VTJSC (json schema credential) for the custom schema
+              # Find the VTJSC (json schema credential) on the ORGANIZATION agent
               VTJSC_VPR_REF="vpr:verana:${CHAIN_ID}/cs/v1/js/${CUSTOM_SCHEMA_ID}"
-              VTJSC_CRED_ID=$(curl -sf "${CHILD_ADMIN_API}/v1/vt/json-schema-credentials" \
+              VTJSC_CRED_ID=$(curl -sf "${ORG_ADMIN_API}/v1/vt/json-schema-credentials" \
                 | jq -r --arg sid "$VTJSC_VPR_REF" '.data[] | select(.schemaId == $sid) | .credential.id')
               if [ -z "$VTJSC_CRED_ID" ]; then
                 echo "::error::No VTJSC credential found for schema ref ${VTJSC_VPR_REF}"
