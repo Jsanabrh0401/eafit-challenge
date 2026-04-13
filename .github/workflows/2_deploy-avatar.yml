@@ -233,8 +233,7 @@ jobs:
 
           # Create AnonCreds credential definition (if enabled and not already created)
           if [ "${ENABLE_ANONCREDS}" = "true" ]; then
-            CHILD_PUBLIC_API="http://localhost:${VS_AGENT_PUBLIC_PORT:-3001}"
-            # Port-forward the public port too
+            # Port-forward the public port to check existing credDefs
             kubectl port-forward -n "$CHART_NAMESPACE" "svc/$RELEASE_NAME" 3001:3001 &
             CHILD_PUBLIC_PF_PID=$!
             sleep 3
@@ -246,16 +245,15 @@ jobs:
                 | jq -r '.[0].id // empty' 2>/dev/null || echo "")
               ok "AnonCreds credential definition already exists: ${ANONCREDS_CRED_DEF_ID} — skipping"
             else
-              # Find the VTJSC for the custom schema
+              # Find the VTJSC (json schema credential) for the custom schema
               VTJSC_VPR_REF="vpr:verana:${CHAIN_ID}/cs/v1/js/${CUSTOM_SCHEMA_ID}"
-              VTJSC_CRED_ID=$(curl -sf "${CHILD_ADMIN_API}/v1/credentials" \
-                | jq -r --arg ref "$VTJSC_VPR_REF" \
-                  '[.[] | select(.credential.credentialSubject.jsonSchema."$ref" == $ref)][0].id // empty')
+              VTJSC_CRED_ID=$(curl -sf "${CHILD_ADMIN_API}/v1/vt/json-schema-credentials" \
+                | jq -r --arg sid "$VTJSC_VPR_REF" '.data[] | select(.schemaId == $sid) | .credential.id')
               if [ -z "$VTJSC_CRED_ID" ]; then
                 echo "::error::No VTJSC credential found for schema ref ${VTJSC_VPR_REF}"
                 exit 1
               fi
-              ANONCREDS_RESULT=$(curl -sf -X POST "${CHILD_ADMIN_API}/v1/anoncreds/credential-definitions" \
+              ANONCREDS_RESULT=$(curl -sf -X POST "${CHILD_ADMIN_API}/v1/credential-types" \
                 -H "Content-Type: application/json" \
                 -d "{\"name\": \"${ANONCREDS_NAME}\", \"version\": \"${ANONCREDS_VERSION}\", \"relatedJsonSchemaCredentialId\": \"${VTJSC_CRED_ID}\", \"supportRevocation\": ${ANONCREDS_SUPPORT_REVOCATION}}")
               ANONCREDS_CRED_DEF_ID=$(echo "$ANONCREDS_RESULT" | jq -r '.id // empty')
